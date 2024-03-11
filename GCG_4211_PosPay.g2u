@@ -1,0 +1,258 @@
+Program.Sub.ScreenSU.Start
+Gui.Form1..Create
+Gui.Form1..Caption("Positive Pay Creation")
+Gui.Form1..Size(5040,2775)
+Gui.Form1..MinX(0)
+Gui.Form1..MinY(0)
+Gui.Form1..Position(0,0)
+Gui.Form1..BackColor(-2147483633)
+Gui.Form1..MousePointer(0)
+Gui.Form1..Sizeable(False)
+Gui.Form1..Event(UnLoad,Form1_UnLoad)
+Gui.Form1.cmdOk.Create(Button)
+Gui.Form1.cmdOk.Size(1185,480)
+Gui.Form1.cmdOk.Position(270,1500)
+Gui.Form1.cmdOk.Caption("Ok")
+Gui.Form1.cmdOk.Event(Click,cmdOk_Click)
+Gui.Form1.lblBegDate.Create(Label,"Beginning Date",True,1935,255,0,255,570,True,0,"Arial",8,-986896,0)
+Gui.Form1.lblEndingDate.Create(Label,"EndingDate",True,1935,255,0,2685,555,True,0,"Arial",8,-986896,0)
+Gui.Form1.dtpBDate.Create(DatePicker)
+Gui.Form1.dtpBDate.Size(1935,285)
+Gui.Form1.dtpBDate.Position(240,855)
+Gui.Form1.dtpEDate.Create(DatePicker)
+Gui.Form1.dtpEDate.Size(1935,285)
+Gui.Form1.dtpEDate.Position(2655,855)
+Variable.UDT.uExport.Define("NAME_VENDOR",String,NAME_VENDOR)
+Variable.UDT.uExport.Define("CK_NO",Float,CK_NO)
+Variable.UDT.uExport.Define("CK_DATE",Date,CK_DATE)
+Variable.UDT.uExport.Define("AMOUNT",Float,AMOUNT)
+Variable.uGlobal.uExport.Declare("uExport")
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Variable.Global.sFileName.Declare(String)
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+'This custom project will create a positive pay export file in the format Check#,Vendor Name, Date, Gross.
+'Date: 10/07/2016
+'Coded by: WAW
+
+'open connection to the database
+F.ODBC.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+'Displays the date selection form
+Gui.Form1..Show
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4211_PosPay.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.CallSub(form1_unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Main.End
+
+Program.Sub.cmdOk_Click.Start
+F.Intrinsic.Control.SetErrorHandler("Form1_UnLoad_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+'closes the screen
+Gui.Form1..Visible(false)
+
+V.uglobal.uexport.redim(-1,-1)
+
+'call the chklog and writerec subroutines and then the unload
+F.Intrinsic.Control.CallSub(Chklog)
+F.Intrinsic.Control.callsub(Writerec)
+F.Intrinsic.Control.CallSub(Form1_unload)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Form1_UnLoad_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4211_PosPay.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.CallSub(form1_unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.cmdOk_Click.End
+
+Program.Sub.Form1_UnLoad.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+'close connection to the database
+F.ODBC.Connection!con.Close
+'closes the program
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4211_PosPay.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.CallSub(form1_unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Form1_UnLoad.End
+
+Program.Sub.ChkLog.Start
+F.Intrinsic.Control.SetErrorHandler("ChkLog_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+v.Local.ssql.Declare(string)
+v.Local.i.Declare(long)
+v.Local.sfilename.Declare(string)
+v.Local.sfilename2.Declare(String)
+v.Local.sbegdate.Declare(String)
+v.Local.senddate.Declare(string)
+v.Local.sfiledate.Declare(string)
+v.Local.scsv.Declare(string)
+
+v.Local.sfiledate.Set(v.Ambient.Date)
+'f.Intrinsic.String.Format(v.Local.sfiledate,"MMDDYY",v.Local.sfiledate)
+
+'f.Intrinsic.String.Build("{0}{1}{2}","POSPAY",v.Local.sfiledate,v.Local.sfile
+
+'set local variables as the dates selected
+V.Local.sbegdate.Set(V.Screen.Form1!dtpBDate.Value)
+V.Local.senddate.Set(V.Screen.Form1!dtpEDate.Value)
+
+'open the file dialog box allowing the user to select where and what name the file that is being created will be
+F.Intrinsic.UI.ShowSaveFileDialog("",".csv",V.Global.sfilename)
+
+'get the file name
+F.Intrinsic.File.GetFileNameFromFQN(V.Local.sfilename,V.Local.sfilename2)
+
+'check to make sure a file was selected
+F.Intrinsic.Control.If(V.Local.sfilename,=,"***CANCEL***")
+	F.Intrinsic.UI.Msgbox("No File Path Was Selected")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+'close the form
+Gui.Form1..Visible(false)
+
+F.Intrinsic.UI.InvokeWaitDialog("Generating Positive Pay File...")
+
+'get and set check date, payee, amount of check and check number
+f.Intrinsic.String.Build("Select V_CHECKS_LOG.CK_DATE, V_CHECKS_LOG.VEND_NO, V_CHECKS_LOG.AMOUNT, V_CHECKS_LOG.CK_NO, V_VENDOR_MASTER.NAME_VENDOR from V_CHECKS_LOG inner join V_VENDOR_MASTER on V_CHECKS_LOG.VEND_NO = V_VENDOR_MASTER.VENDOR where V_CHECKS_LOG.CK_OR_VOID = 'C' and V_CHECKS_LOG.CK_DATE between '{0}' and '{1}'",V.Local.sbegdate.PervasiveDate,V.Local.senddate.PervasiveDate,V.Local.ssql)
+'F.Intrinsic.String.Build("select CK_DATE, CK_NO, PAYEE, AMOUNT from V_CHECKS_LOG where CK_OR_VOID = 'C' and CK_DATE between '{0}' and '{1}'",V.Local.dbdate.PervasiveDate,V.Local.dedate.PervasiveDate,V.Local.ssql)
+F.ODBC.Connection!con.OpenRecordsetRO("rst",V.Local.ssql)
+F.Intrinsic.Control.DoUntil(V.ODBC.con!rst.EOF,=,"True")
+	F.Intrinsic.Control.If(V.uGlobal.uExport.UBound,=,-1)
+		V.uGlobal.uExport.Redim(0,0)
+		V.uGlobal.uExport!CK_DATE.Set(V.ODBC.con!rst.FieldValTrim!CK_DATE)
+		V.uGlobal.uExport!CK_NO.Set(V.ODBC.con!rst.FieldValTrim!CK_NO)
+		V.uGlobal.uExport!NAME_VENDOR.Set(V.ODBC.con!rst.FieldValTrim!NAME_VENDOR)
+		V.uGlobal.uExport!AMOUNT.Set(V.ODBC.con!rst.FieldValTrim!AMOUNT)	
+	F.Intrinsic.Control.Else
+		V.Local.i.Set(V.uGlobal.uExport.UBound)
+		F.Intrinsic.Math.Add(V.Local.i,1,V.Local.i)
+		V.uGlobal.uExport.RedimPreserve(v.uGlobal.uExport.LBound,V.Local.i)
+		V.uGlobal.uExport(v.Local.i)!CK_DATE.Set(V.ODBC.con!rst.FieldValTrim!CK_DATE)
+		V.uGlobal.uExport(v.Local.i)!CK_NO.Set(V.ODBC.con!rst.FieldValTrim!CK_NO)
+		V.uGlobal.uExport(v.Local.i)!NAME_VENDOR.Set(V.ODBC.con!rst.FieldValTrim!NAME_VENDOR)
+		V.uGlobal.uExport(v.Local.i)!AMOUNT.Set(V.ODBC.con!rst.FieldValTrim!AMOUNT)
+	F.Intrinsic.Control.EndIf
+	'move on to the next record in the recordset
+	F.ODBC.con!rst.MoveNext
+F.intrinsic.Control.Loop
+
+'call the write rec sub
+f.Intrinsic.Control.CallSub(writerec)
+
+'close wait dialog
+f.Intrinsic.UI.CloseWaitDialog
+
+'inform the user
+f.Intrinsic.UI.Msgbox("Positive Pay File Created")
+
+'call unload
+f.Intrinsic.Control.CallSub(form1_unload)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("ChkLog_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4211_PosPay.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.CallSub(form1_unload)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.ChkLog.End
+
+Program.Sub.Writerec.Start
+F.Intrinsic.Control.SetErrorHandler("Writerec_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sfile.Declare(String)
+V.Local.sdir.Declare(String)
+V.Local.ihndl.Declare(Long)
+V.Local.i.Declare(Long)
+V.Local.slinedata.Declare(String)
+V.Local.sFileData.Declare(String)
+V.Local.sdate.Declare(String)
+V.Local.stime.Declare(String)
+
+'formats the ambient time and ambient date
+F.Intrinsic.String.Format(V.Ambient.Date,"MMDDYY",V.Local.sdate)
+'F.Intrinsic.String.Format(V.Ambient.Time,"HHMM",V.Local.stime)
+
+'Builds function for how the file will be saved
+F.Intrinsic.String.Build("{0}\POSPAY{1}.txt",V.Caller.filesdir,V.Local.sdate,V.Local.sfile)
+
+'Check#,Vendor Name, Date, Gross.
+
+'Check the ubound of CK_NO to see if greater than -1
+F.Intrinsic.Control.If(V.uGlobal.uExport!CK_NO.UBound,>,-1)
+	F.Intrinsic.Control.for(V.Local.i,V.uGlobal.uExport!CK_NO.LBound,V.uGlobal.uExport!CK_NO.UBound,1)
+		F.Intrinsic.Control.If(V.Local.i,=,0)
+			F.Intrinsic.String.Build("{0}*!*{1}*!*{2}*!*{3}{4}",V.uGlobal.uExport(v.Local.i)!CK_NO.Trim,V.uGlobal.uExport(v.Local.i)!NAME_VENDOR.Trim,V.uGlobal.uExport(v.Local.i)!CK_DATE,V.uGlobal.uExport(v.Local.i)!AMOUNT,V.ambient.newline,V.Local.slinedata)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Build("{0}{1}*!*{2}*!*{3}*!*{4}{5}",V.Local.slinedata,V.uGlobal.uExport(v.Local.i)!CK_NO.Trim,V.uGlobal.uExport(v.Local.i)!NAME_VENDOR.Trim,V.uGlobal.uExport(v.Local.i)!CK_DATE.Trim,V.uGlobal.uExport(v.Local.i)!AMOUNT,V.ambient.newline,V.Local.slinedata)
+F.Intrinsic.Control.EndIf
+	F.intrinsic.control.next(V.local.i)
+F.Intrinsic.String.Build("{0}{1}{2}",V.Local.sFileData,V.Local.slinedata,V.Ambient.NewLine,V.Local.sFileData)
+	'if there is no data based on the selected range a message box will tell the user that
+F.Intrinsic.Control.Else
+	F.Intrinsic.UI.Msgbox("No data found for selected range.")
+	F.Intrinsic.Control.ExitSub
+F.intrinsic.control.endif
+
+F.Intrinsic.String.replace(V.Local.sFileData,","," ",V.Local.sFileData)
+F.Intrinsic.String.Replace(V.local.sfiledata,"*!*"," , ",V.Local.sfiledata)
+
+'write the string to a file
+F.Intrinsic.File.String2File(V.Global.sFileName.Trim,V.Local.sFileData)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Writerec_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4211_PosPay.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.CallSub(form1_unload)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Writerec.End
+
+Program.Sub.Comments.Start
+${$0$}$$}$WAW$}$10/7/2016 12:06:38 PM$}$False
+Program.Sub.Comments.End
